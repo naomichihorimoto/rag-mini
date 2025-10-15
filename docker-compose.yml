@@ -1,0 +1,39 @@
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - RAILS_ENV=development
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/rag_dev
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBED_MODEL=nomic-embed-text   # 768次元
+      - OLLAMA_GEN_MODEL=llama3.1:8b-instruct # お好みで
+      - VECTOR_DIM=768
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - ollama
+
+  db:
+    image: pgvector/pgvector:pg16   # pgvector入りのPostgres 16
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=rag_dev
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rag_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+volumes:
+  ollama: {}
