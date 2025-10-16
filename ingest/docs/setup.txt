@@ -1,0 +1,36 @@
+開発環境セットアップ手順
+
+1. 必要なソフトウェア
+- Ruby 3.2 以上
+- Node.js 18 以上
+- PostgreSQL 14 以上
+- Docker Desktop
+
+2. プロジェクトのクローン
+git clone https://github.com/example/project.git
+cd project
+
+3. 依存関係のインストール
+bundle install
+npm install
+
+4. データベースのセットアップ
+rails db:create
+rails db:migrate
+rails db:seed
+
+5. 環境変数の設定
+.env.example を .env にコピーして必要な値を設定してください
+
+6. サーバーの起動
+rails server
+または
+docker-compose up
+
+7. 動作確認
+ブラウザで http://localhost:3000 にアクセスして動作を確認してください
+
+8. テストの実行
+bundle exec rspec
+または
+npm test
