@@ -1,24 +1,20 @@
-# README
+# rag-mini
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+簡単な文書をRAGで扱うためのアプリ
 
-Things you may want to cover:
+生成AIのランタイムにOllamaを用いることで、トークンコストを抑えています
 
-* Ruby version
+## 環境構築
 
-* System dependencies
+1. `docker compose build`
+2. `docker compose up`
+3. `docker compose exec web rails db:create`
+4. `docker compose exec web rails db:migrate`
 
-* Configuration
+## 文書のimport方法
 
-* Database creation
+import部分作ったら書きます
 
-* Database initialization
+## 使用方法
 
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+ベクトル検索〜回答生成＆返却部分作ったら書きます
