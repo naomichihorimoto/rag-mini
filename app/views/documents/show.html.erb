@@ -1,0 +1,35 @@
+<div class="container" style="padding: 2rem 1rem;">
+  <div style="max-width: 800px; margin: 0 auto;">
+    <div class="card">
+      <!-- ヘッダー -->
+      <div style="border-bottom: 1px solid #e5e5e5; padding-bottom: 1rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <h1 style="font-size: 1.875rem; font-weight: bold; color: #333; margin: 0;"><%= @document.title %></h1>
+          <span style="font-size: 0.875rem; color: #666;">
+            <%= @document.created_at.strftime("%Y年%m月%d日 %H:%M") %>
+          </span>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 0.75rem; font-size: 0.875rem; color: #666;">
+          <span>📝 <%= @document.content.length %> 文字</span>
+          <span>🧠 <%= @document.embedding.present? ? "埋め込み済み (#{@document.embedding.length}次元)" : "埋め込みなし" %></span>
+        </div>
+      </div>
+
+      <!-- コンテンツ -->
+      <div style="margin-bottom: 2rem;">
+        <div style="color: #444; line-height: 1.7; white-space: pre-wrap;">
+          <%= simple_format(@document.content) %>
+        </div>
+      </div>
+
+      <!-- フッター -->
+      <div style="border-top: 1px solid #e5e5e5; padding-top: 1.5rem;">
+        <div style="display: flex; gap: 1rem;">
+          <%= link_to "← 戻る", documents_path, class: "btn btn-secondary" %>
+          <%= link_to "🔍 このドキュメントで検索", search_documents_path(q: @document.title), class: "btn btn-primary" %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,97 @@
+<div class="container" style="padding: 2rem 1rem;">
+  <div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="font-size: 2rem; font-weight: bold; color: #333; margin-bottom: 2rem;">📚 文書検索システム</h1>
+
+    <!-- 検索フォーム -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <%= form_with url: search_documents_path, method: :get, style: "margin-bottom: 1rem;" do |f| %>
+        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+          <%= f.text_field :q,
+                value: @search_query,
+                placeholder: "文書を検索...",
+                class: "form-control",
+                style: "flex: 1;" %>
+          <%= f.submit "🔍 検索", class: "btn btn-primary" %>
+        </div>
+      <% end %>
+
+      <% if @search_query.present? %>
+        <div style="font-size: 0.9rem; color: #666;">
+          検索クエリ: "<strong><%= @search_query %></strong>"
+        </div>
+      <% end %>
+    </div>
+
+    <!-- 検索結果またはドキュメント一覧 -->
+    <div>
+      <% if @search_performed %>
+        <h2 style="font-size: 1.5rem; font-weight: 600; color: #333; margin-bottom: 1rem;">
+          🎯 検索結果 (<%= @documents.length %>件)
+        </h2>
+      <% else %>
+        <h2 style="font-size: 1.5rem; font-weight: 600; color: #333; margin-bottom: 1rem;">
+          📄 全ドキュメント (<%= @documents.length %>件)
+        </h2>
+      <% end %>
+
+      <% if @documents.any? %>
+        <% @documents.each_with_index do |document, index| %>
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+              <h3 style="font-size: 1.25rem; font-weight: 600; margin: 0;">
+                <%= link_to document_path(document), style: "color: #333; text-decoration: none;" do %>
+                  <%= document.title %>
+                <% end %>
+              </h3>
+              <span style="font-size: 0.875rem; color: #666;">
+                <%= document.created_at.strftime("%Y/%m/%d %H:%M") %>
+              </span>
+            </div>
+
+            <div style="color: #666; margin-bottom: 1rem; line-height: 1.6;">
+              <%= simple_format(truncate(document.content, length: 300)) %>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; gap: 1rem; font-size: 0.875rem; color: #666;">
+                <span>📝 <%= document.content.length %> 文字</span>
+                <span>🧠 <%= document.embedding.present? ? "埋め込み済み" : "埋め込みなし" %></span>
+              </div>
+
+              <%= link_to document_path(document),
+                    style: "color: #3b82f6; text-decoration: none; font-size: 0.875rem; font-weight: 500;" do %>
+                詳細を見る →
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      <% else %>
+        <div class="card" style="text-align: center; padding: 3rem;">
+          <div style="color: #666; font-size: 1.125rem; margin-bottom: 1rem;">
+            <% if @search_performed %>
+              🔍 検索結果が見つかりませんでした
+            <% else %>
+              📝 ドキュメントがありません
+            <% end %>
+          </div>
+          <p style="color: #999; margin: 0;">
+            <% if @search_performed %>
+              別のキーワードで検索してみてください
+            <% else %>
+              rake rag:ingest でドキュメントを取り込んでください
+            <% end %>
+          </p>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- 操作ボタン -->
+    <div style="margin-top: 2rem; text-align: center;">
+      <% unless @search_performed %>
+        <%= link_to "🏠 ホーム", root_path, class: "btn btn-secondary" %>
+      <% else %>
+        <%= link_to "📄 全ドキュメント", documents_path, class: "btn btn-secondary" %>
+      <% end %>
+    </div>
+  </div>
+</div>
