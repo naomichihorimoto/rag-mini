@@ -133,6 +133,59 @@ namespace :rag do
     end
   end
 
+  desc "Test LLM generation"
+  task test_llm: :environment do
+    ollama_base_url = ENV['OLLAMA_BASE_URL'] || 'http://localhost:11434'
+    ollama_gen_model = ENV['OLLAMA_GEN_MODEL'] || 'gemma3:4b'
+
+    puts "Testing LLM generation..."
+    puts "Ollama URL: #{ollama_base_url}"
+    puts "Model: #{ollama_gen_model}"
+
+    test_prompt = "こんにちは。簡単な挨拶をしてください。"
+    puts "Test prompt: #{test_prompt}"
+
+    begin
+      response = Document.generate_llm_response(test_prompt)
+      puts "✅ LLM Response: #{response}"
+    rescue => e
+      puts "❌ LLM Test failed: #{e.message}"
+      puts "Make sure:"
+      puts "1. Ollama service is running"
+      puts "2. #{ollama_gen_model} model is installed"
+      puts "3. Network connectivity is working"
+    end
+  end
+
+  desc "Test full AI answer generation"
+  task test_ai_answer: :environment do
+    puts "Testing full AI answer generation..."
+
+    # テスト用のクエリ
+    test_query = "パスワードについて教えて"
+    puts "Test query: #{test_query}"
+
+    begin
+      # セマンティック検索
+      puts "1. Running semantic search..."
+      documents = Document.semantic_search(test_query, limit: 3)
+      puts "Found #{documents.length} documents"
+
+      if documents.any?
+        # AI回答生成
+        puts "2. Generating AI answer..."
+        answer = Document.generate_ai_answer(test_query, documents)
+        puts "✅ AI Answer generated:"
+        puts answer
+      else
+        puts "❌ No documents found for semantic search"
+      end
+    rescue => e
+      puts "❌ Test failed: #{e.message}"
+      puts e.backtrace.first(5)
+    end
+  end
+
   private
 
   def generate_embedding(text)

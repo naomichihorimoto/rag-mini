@@ -1,0 +1,77 @@
+<div class="container" style="padding: 2rem 1rem;">
+  <div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="font-size: 2rem; font-weight: bold; color: #333; margin-bottom: 2rem;">🤖 AI回答</h1>
+
+    <!-- 質問表示 -->
+    <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: white;">📝 あなたの質問</h2>
+      <p style="font-size: 1.1rem; margin: 0; line-height: 1.6;"><%= @search_query %></p>
+    </div>
+
+    <!-- AI回答 -->
+    <div class="card" style="margin-bottom: 2rem; border-left: 4px solid #10b981;">
+      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: #10b981;">🤖 AI回答</h2>
+      <div style="font-size: 1rem; line-height: 1.7; color: #333; white-space: pre-wrap;">
+        <%= simple_format(@ai_answer) %>
+      </div>
+    </div>
+
+    <!-- 参考文書 -->
+    <% if @used_documents.present? %>
+      <div class="card" style="margin-bottom: 2rem;">
+        <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #333;">📚 参考にした文書</h3>
+
+        <% @used_documents.each_with_index do |document, index| %>
+          <div style="border: 1px solid #e5e5e5; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; background: #f9f9f9;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+              <h4 style="font-size: 1rem; font-weight: 600; margin: 0;">
+                <%= link_to document_path(document), style: "color: #3b82f6; text-decoration: none;" do %>
+                  📄 <%= document.title %>
+                <% end %>
+              </h4>
+              <span style="font-size: 0.875rem; color: #666; background: #e5e7eb; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">
+                文書 <%= index + 1 %>
+              </span>
+            </div>
+
+            <p style="color: #666; margin: 0; font-size: 0.9rem; line-height: 1.5;">
+              <%= truncate(document.content, length: 200) %>
+            </p>
+
+            <div style="margin-top: 0.75rem;">
+              <%= link_to document_path(document),
+                    style: "color: #3b82f6; text-decoration: none; font-size: 0.875rem; font-weight: 500;" do %>
+                詳細を見る →
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <!-- 操作ボタン -->
+    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+      <%= link_to "← 戻る", documents_path, class: "btn btn-secondary" %>
+
+      <%= form_with url: answer_documents_path, method: :get, style: "display: inline-block;" do |f| %>
+        <%= f.hidden_field :q, value: @search_query %>
+        <%= f.submit "🔄 再生成", class: "btn btn-primary" %>
+      <% end %>
+
+      <%= link_to "📄 検索結果を見る", search_documents_path(q: @search_query), class: "btn btn-secondary" %>
+    </div>
+
+    <!-- 新しい質問フォーム -->
+    <div class="card" style="margin-top: 2rem; background: #f8fafc;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #333;">💭 新しい質問をする</h3>
+
+      <%= form_with url: answer_documents_path, method: :get, style: "display: flex; gap: 1rem;" do |f| %>
+        <%= f.text_field :q,
+              placeholder: "他に質問はありますか？",
+              class: "form-control",
+              style: "flex: 1;" %>
+        <%= f.submit "🤖 AI回答", class: "btn btn-primary" %>
+      <% end %>
+    </div>
+  </div>
+</div>

@@ -4,16 +4,60 @@
 
     <!-- 検索フォーム -->
     <div class="card" style="margin-bottom: 2rem;">
-      <%= form_with url: search_documents_path, method: :get, style: "margin-bottom: 1rem;" do |f| %>
+      <div style="margin-bottom: 1rem;">
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-          <%= f.text_field :q,
-                value: @search_query,
-                placeholder: "文書を検索...",
-                class: "form-control",
-                style: "flex: 1;" %>
-          <%= f.submit "🔍 検索", class: "btn btn-primary" %>
+          <input type="text" id="search-input" placeholder="文書を検索 or 質問してください..." class="form-control" style="flex: 1;" value="<%= @search_query %>">
+          <button onclick="performSearch()" class="btn btn-primary">🔍 検索</button>
+          <button onclick="performAnswer()" class="btn btn-primary" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">🤖 AI回答</button>
         </div>
-      <% end %>
+
+        <script>
+          function getSearchQuery() {
+            return document.getElementById('search-input').value;
+          }
+
+          function performSearch() {
+            const query = getSearchQuery();
+            if (query.trim()) {
+              window.location.href = '<%= search_documents_path %>?q=' + encodeURIComponent(query);
+            }
+          }
+
+          function performAnswer() {
+            const query = getSearchQuery();
+            if (query.trim()) {
+              // ローディング表示
+              showLoading();
+              window.location.href = '<%= answer_documents_path %>?q=' + encodeURIComponent(query);
+            }
+          }
+
+          function showLoading() {
+            const button = document.querySelector('button[onclick="performAnswer()"]');
+            if (button) {
+              button.innerHTML = '🤖 AI回答生成中...';
+              button.disabled = true;
+            }
+          }
+
+          // Enterキーでの検索
+          document.getElementById('search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+              performSearch();
+            }
+          });
+        </script>
+
+        <!-- 既存の検索結果がある場合の追加AI回答ボタン -->
+        <% if @search_query.present? && @search_performed %>
+          <%= form_with url: answer_documents_path, method: :get, style: "margin-top: 1rem;" do |f| %>
+            <%= f.hidden_field :q, value: @search_query %>
+            <div style="text-align: center;">
+              <%= f.submit "🤖 この検索結果でAI回答を生成", class: "btn btn-secondary" %>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
 
       <% if @search_query.present? %>
         <div style="font-size: 0.9rem; color: #666;">

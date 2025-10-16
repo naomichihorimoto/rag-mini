@@ -28,6 +28,41 @@ class DocumentsController < ApplicationController
     end
   end
 
+  def answer
+    @search_query = params[:q]
+
+    if @search_query.blank?
+      redirect_to documents_path, alert: '質問を入力してください'
+      return
+    end
+
+    begin
+      # セマンティック検索で関連文書を取得
+      @documents = Document.semantic_search(@search_query, limit: 5)
+
+      if @documents.empty?
+        @ai_answer = "申し訳ございませんが、ご質問に関連する文書が見つかりませんでした。"
+        @used_documents = []
+      else
+        # 検索結果をLLMに渡して回答を生成
+        puts "Documents found: #{@documents.length}"
+        @documents.each_with_index do |doc, i|
+          puts "Document #{i+1}: #{doc.title} (#{doc.content.length} chars)"
+        end
+
+        puts "Calling generate_ai_answer..."
+        @ai_answer = Document.generate_ai_answer(@search_query, @documents)
+        puts "AI Answer generated: #{@ai_answer[0..100]}..." if @ai_answer
+        @used_documents = @documents
+      end
+      @answer_generated = true
+
+    rescue => e
+      Rails.logger.error "Answer generation error: #{e.message}"
+      redirect_to documents_path, alert: 'AI回答の生成中にエラーが発生しました。Ollamaサービスが起動していることを確認してください。'
+    end
+  end
+
   private
 
   def set_document

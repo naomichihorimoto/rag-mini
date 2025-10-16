@@ -13,6 +13,7 @@ Rails.application.routes.draw do
   resources :documents, only: [:index, :show] do
     collection do
       get :search
+      get :answer
     end
   end
 
