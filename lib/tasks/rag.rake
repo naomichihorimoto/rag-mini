@@ -41,7 +41,8 @@ namespace :rag do
         # ファイル名からタイトルを生成（拡張子を除く）
         title = File.basename(file_path, '.*')
 
-        puts "  Generating embeddings using nomic-embed-text..."
+        ollama_model = ENV['OLLAMA_EMBED_MODEL'] || 'nomic-embed-text'
+        puts "  Generating embeddings using #{ollama_model}..."
         embedding = generate_embedding(content)
 
         if embedding.nil?
