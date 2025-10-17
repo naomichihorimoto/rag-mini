@@ -18,8 +18,8 @@
 
       <!-- コンテンツ -->
       <div style="margin-bottom: 2rem;">
-        <div style="color: #444; line-height: 1.7; white-space: pre-wrap;">
-          <%= simple_format(@document.content) %>
+        <div class="document-content-full" data-content="<%= html_escape(@document.content) %>" style="color: #444; line-height: 1.7;">
+          <!-- Markdown content will be rendered here by JavaScript -->
         </div>
       </div>
 
@@ -33,3 +33,119 @@
     </div>
   </div>
 </div>
+
+<style>
+/* Markdown content styling for full document view */
+.document-content-full h1, .document-content-full h2, .document-content-full h3, .document-content-full h4, .document-content-full h5, .document-content-full h6 {
+  margin: 1.5rem 0 1rem 0;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.document-content-full h1 { font-size: 1.75rem; }
+.document-content-full h2 { font-size: 1.5rem; }
+.document-content-full h3 { font-size: 1.25rem; }
+.document-content-full h4 { font-size: 1.125rem; }
+.document-content-full h5 { font-size: 1rem; }
+.document-content-full h6 { font-size: 0.875rem; }
+
+.document-content-full ul, .document-content-full ol {
+  margin: 1rem 0;
+  padding-left: 2rem;
+}
+
+.document-content-full li {
+  margin: 0.5rem 0;
+}
+
+.document-content-full p {
+  margin: 1rem 0;
+}
+
+.document-content-full blockquote {
+  border-left: 4px solid #d1d5db;
+  margin: 1rem 0;
+  padding-left: 1rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.document-content-full code {
+  background: #f3f4f6;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+}
+
+.document-content-full pre {
+  background: #1f2937;
+  color: #f9fafb;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.document-content-full pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.document-content-full table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.document-content-full th, .document-content-full td {
+  border: 1px solid #d1d5db;
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.document-content-full th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
+.document-content-full a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.document-content-full a:hover {
+  color: #1d4ed8;
+}
+
+.document-content-full strong {
+  font-weight: 600;
+}
+
+.document-content-full em {
+  font-style: italic;
+}
+
+.document-content-full hr {
+  border: none;
+  border-top: 1px solid #d1d5db;
+  margin: 2rem 0;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // document-content-full 要素を取得してマークダウンをレンダリング
+  const contentElement = document.querySelector('.document-content-full');
+
+  if (contentElement) {
+    const markdownContent = contentElement.getAttribute('data-content');
+    if (markdownContent && typeof marked !== 'undefined') {
+      // マークダウンをHTMLに変換
+      const htmlContent = marked.parse(markdownContent);
+      contentElement.innerHTML = htmlContent;
+    }
+  }
+});
+</script>
