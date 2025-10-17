@@ -14,6 +14,7 @@ Rails.application.routes.draw do
     collection do
       get :search
       get :answer
+      get :stream_answer
     end
   end
 

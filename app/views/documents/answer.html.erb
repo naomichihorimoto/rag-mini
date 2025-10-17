@@ -11,67 +11,168 @@
     <!-- AI回答 -->
     <div class="card" style="margin-bottom: 2rem; border-left: 4px solid #10b981;">
       <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: #10b981;">🤖 AI回答</h2>
-      <div style="font-size: 1rem; line-height: 1.7; color: #333; white-space: pre-wrap;">
-        <%= simple_format(@ai_answer) %>
+
+      <!-- ローディング表示 -->
+      <div id="loading-indicator" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+        <div style="width: 20px; height: 20px; border: 2px solid #10b981; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <span style="color: #666;">AIが回答を生成中...</span>
+      </div>
+
+      <!-- ストリーミング回答表示エリア -->
+      <div id="ai-answer" style="font-size: 1rem; line-height: 1.7; color: #333; min-height: 50px; border: 1px solid #e5e5e5; padding: 1rem; border-radius: 0.5rem; background: #fafafa;">
+      </div>
+
+      <!-- エラー表示エリア -->
+      <div id="error-message" style="display: none; color: #dc2626; background: #fef2f2; padding: 1rem; border-radius: 0.5rem; margin-top: 1rem;">
       </div>
     </div>
 
     <!-- 参考文書 -->
-    <% if @used_documents.present? %>
-      <div class="card" style="margin-bottom: 2rem;">
-        <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #333;">📚 参考にした文書</h3>
-
-        <% @used_documents.each_with_index do |document, index| %>
-          <div style="border: 1px solid #e5e5e5; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; background: #f9f9f9;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
-              <h4 style="font-size: 1rem; font-weight: 600; margin: 0;">
-                <%= link_to document_path(document), style: "color: #3b82f6; text-decoration: none;" do %>
-                  📄 <%= document.title %>
-                <% end %>
-              </h4>
-              <span style="font-size: 0.875rem; color: #666; background: #e5e7eb; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">
-                文書 <%= index + 1 %>
-              </span>
-            </div>
-
-            <p style="color: #666; margin: 0; font-size: 0.9rem; line-height: 1.5;">
-              <%= truncate(document.content, length: 200) %>
-            </p>
-
-            <div style="margin-top: 0.75rem;">
-              <%= link_to document_path(document),
-                    style: "color: #3b82f6; text-decoration: none; font-size: 0.875rem; font-weight: 500;" do %>
-                詳細を見る →
-              <% end %>
-            </div>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
+    <div id="reference-documents" class="card" style="margin-bottom: 2rem; display: none;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #333;">📚 参考にした文書</h3>
+      <div id="documents-list"></div>
+    </div>
 
     <!-- 操作ボタン -->
     <div style="display: flex; gap: 1rem; margin-top: 2rem;">
       <%= link_to "← 戻る", documents_path, class: "btn btn-secondary" %>
-
       <%= form_with url: answer_documents_path, method: :get, style: "display: inline-block;" do |f| %>
         <%= f.hidden_field :q, value: @search_query %>
         <%= f.submit "🔄 再生成", class: "btn btn-primary" %>
       <% end %>
-
       <%= link_to "📄 検索結果を見る", search_documents_path(q: @search_query), class: "btn btn-secondary" %>
     </div>
 
     <!-- 新しい質問フォーム -->
     <div class="card" style="margin-top: 2rem; background: #f8fafc;">
       <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #333;">💭 新しい質問をする</h3>
-
       <%= form_with url: answer_documents_path, method: :get, style: "display: flex; gap: 1rem;" do |f| %>
-        <%= f.text_field :q,
-              placeholder: "他に質問はありますか？",
-              class: "form-control",
-              style: "flex: 1;" %>
+        <%= f.text_field :q, placeholder: "他に質問はありますか？", class: "form-control", style: "flex: 1;" %>
         <%= f.submit "🤖 AI回答", class: "btn btn-primary" %>
       <% end %>
     </div>
   </div>
 </div>
+
+<style>
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const query = '<%= j(@search_query) %>';
+  if (query) {
+    startStreamingAnswer(query);
+  }
+});
+
+function startStreamingAnswer(query) {
+  const loadingIndicator = document.getElementById('loading-indicator');
+  const aiAnswerDiv = document.getElementById('ai-answer');
+  const errorDiv = document.getElementById('error-message');
+  const referenceDocsDiv = document.getElementById('reference-documents');
+
+  // 初期状態
+  loadingIndicator.style.display = 'flex';
+  aiAnswerDiv.innerHTML = '';
+  errorDiv.style.display = 'none';
+  referenceDocsDiv.style.display = 'none';
+
+  let answerText = '';
+  let messageCount = 0;
+
+  const eventSource = new EventSource('/documents/stream_answer?q=' + encodeURIComponent(query));
+
+  eventSource.onmessage = function(event) {
+    messageCount++;
+    const timestamp = new Date().toLocaleTimeString();
+
+    // リアルタイム受信をコンソールで確認
+    console.log(`[${timestamp}] Message ${messageCount}: ${event.data.substring(0, 100)}...`);
+
+    try {
+      const data = JSON.parse(event.data);
+
+      // 即座にDOM更新（遅延なし）
+      switch (data.type) {
+        case 'documents':
+          displayReferenceDocuments(data.data);
+          referenceDocsDiv.style.display = 'block';
+          console.log(`[${timestamp}] Documents displayed`);
+          break;
+
+        case 'answer_start':
+          loadingIndicator.style.display = 'none';
+          console.log(`[${timestamp}] Answer started`);
+          break;
+
+        case 'data':
+          if (data.content) {
+            answerText += data.content;
+            aiAnswerDiv.innerHTML = answerText.replace(/\n/g, '<br>');
+            console.log(`[${timestamp}] Content added: "${data.content}" (total: ${answerText.length} chars)`);
+          }
+
+          if (data.final) {
+            eventSource.close();
+            console.log(`[${timestamp}] Streaming completed`);
+          }
+          break;
+
+        case 'answer_complete':
+          eventSource.close();
+          console.log(`[${timestamp}] Answer complete`);
+          break;
+
+        case 'error':
+          showError(data.message);
+          eventSource.close();
+          console.log(`[${timestamp}] Error: ${data.message}`);
+          break;
+      }
+    } catch (e) {
+      console.error(`[${timestamp}] Parse error:`, e);
+    }
+  };
+
+  eventSource.onerror = function(event) {
+    console.error('EventSource error:', event);
+    showError('接続エラーが発生しました。');
+    eventSource.close();
+  };
+}
+
+function displayReferenceDocuments(documents) {
+  const documentsListDiv = document.getElementById('documents-list');
+  documentsListDiv.innerHTML = documents.map((doc, index) => `
+    <div style="border: 1px solid #e5e5e5; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; background: #f9f9f9;">
+      <h4 style="font-size: 1rem; font-weight: 600; margin: 0 0 0.75rem 0;">
+        <a href="/documents/${doc.id}" style="color: #3b82f6; text-decoration: none;">
+          📄 ${escapeHtml(doc.title)}
+        </a>
+      </h4>
+      <p style="color: #666; margin: 0; font-size: 0.9rem; line-height: 1.5;">
+        ${escapeHtml(doc.content)}
+      </p>
+    </div>
+  `).join('');
+}
+
+function showError(message) {
+  const loadingIndicator = document.getElementById('loading-indicator');
+  const errorDiv = document.getElementById('error-message');
+
+  loadingIndicator.style.display = 'none';
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+</script>

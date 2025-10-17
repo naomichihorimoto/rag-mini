@@ -1,0 +1,331 @@
+<div class="container" style="padding: 2rem 1rem;">
+  <div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="font-size: 2rem; font-weight: bold; color: #333; margin-bottom: 2rem;">🤖 AI回答</h1>
+
+    <!-- 質問表示 -->
+    <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: white;">📝 あなたの質問</h2>
+      <p style="font-size: 1.1rem; margin: 0; line-height: 1.6;"><%= @search_query %></p>
+    </div>
+
+    <!-- AI回答 -->
+    <div class="card" style="margin-bottom: 2rem; border-left: 4px solid #10b981;">
+      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: #10b981;">🤖 AI回答</h2>
+      
+      <!-- ローディング表示 -->
+      <div id="loading-indicator" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+        <div style="width: 20px; height: 20px; border: 2px solid #10b981; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <span style="color: #666;">AIが回答を生成中...</span>
+      </div>
+      
+      <!-- ストリーミング回答表示エリア -->
+      <div id="ai-answer" style="font-size: 1rem; line-height: 1.7; color: #333; min-height: 50px; border: 1px solid #e5e5e5; padding: 1rem; border-radius: 0.5rem; background: #fafafa;">
+      </div>
+
+      <!-- エラー表示エリア -->
+      <div id="error-message" style="display: none; color: #dc2626; background: #fef2f2; padding: 1rem; border-radius: 0.5rem; margin-top: 1rem;">
+      </div>
+    </div>
+
+    <!-- 参考文書 -->
+    <div id="reference-documents" class="card" style="margin-bottom: 2rem; display: none;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #333;">📚 参考にした文書</h3>
+      <div id="documents-list"></div>
+    </div>
+
+    <!-- 操作ボタン -->
+    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+      <%= link_to "← 戻る", documents_path, class: "btn btn-secondary" %>
+
+      <%= form_with url: answer_documents_path, method: :get, style: "display: inline-block;" do |f| %>
+        <%= f.hidden_field :q, value: @search_query %>
+        <%= f.submit "🔄 再生成", class: "btn btn-primary" %>
+      <% end %>
+
+      <%= link_to "📄 検索結果を見る", search_documents_path(q: @search_query), class: "btn btn-secondary" %>
+    </div>
+
+    <!-- 新しい質問フォーム -->
+    <div class="card" style="margin-top: 2rem; background: #f8fafc;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #333;">💭 新しい質問をする</h3>
+
+      <%= form_with url: answer_documents_path, method: :get, style: "display: flex; gap: 1rem;" do |f| %>
+        <%= f.text_field :q,
+              placeholder: "他に質問はありますか？",
+              class: "form-control",
+              style: "flex: 1;" %>
+        <%= f.submit "🤖 AI回答", class: "btn btn-primary" %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const query = '<%= j(@search_query) %>';
+  
+  if (query) {
+    startStreamingAnswer(query);
+  }
+});
+
+function startStreamingAnswer(query) {
+  const loadingIndicator = document.getElementById('loading-indicator');
+  const aiAnswerDiv = document.getElementById('ai-answer');
+  const errorDiv = document.getElementById('error-message');
+  const referenceDocsDiv = document.getElementById('reference-documents');
+  
+  // DOM要素の取得確認
+  console.log('DOM elements check:');
+  console.log('loadingIndicator:', loadingIndicator);
+  console.log('aiAnswerDiv:', aiAnswerDiv);
+  console.log('errorDiv:', errorDiv);
+  console.log('referenceDocsDiv:', referenceDocsDiv);
+  
+  if (!aiAnswerDiv) {
+    console.error('ai-answer element not found!');
+    return;
+  }
+  
+  // 初期状態の設定
+  loadingIndicator.style.display = 'flex';
+  aiAnswerDiv.textContent = '';
+  errorDiv.style.display = 'none';
+  referenceDocsDiv.style.display = 'none';
+  
+  // タイマーテスト（より視覚的に分かりやすく）
+  console.log('Starting timer test...');
+  let testText = '';
+  let counter = 0;
+  
+  // 最初にテスト用のスタイルを設定
+  aiAnswerDiv.style.backgroundColor = '#ffff99';
+  aiAnswerDiv.style.border = '2px solid red';
+  aiAnswerDiv.style.fontSize = '20px';
+  aiAnswerDiv.style.color = 'red';
+  aiAnswerDiv.style.padding = '20px';
+  aiAnswerDiv.style.margin = '10px';
+  aiAnswerDiv.style.display = 'block';
+  aiAnswerDiv.style.visibility = 'visible';
+  aiAnswerDiv.style.opacity = '1';
+  aiAnswerDiv.style.position = 'relative';
+  aiAnswerDiv.style.zIndex = '9999';
+  aiAnswerDiv.style.minHeight = '100px';
+  aiAnswerDiv.style.width = '100%';
+  
+  const testInterval = setInterval(() => {
+    counter++;
+    testText += `チャンク${counter} `;
+    
+    // 複数の方法でDOM更新を試す
+    aiAnswerDiv.textContent = testText;
+    aiAnswerDiv.innerHTML = testText;
+    
+    console.log(`Timer test ${counter}: ${testText}`);
+    console.log('Current aiAnswerDiv content:', aiAnswerDiv.textContent);
+    console.log('Current aiAnswerDiv innerHTML:', aiAnswerDiv.innerHTML);
+    
+    // 要素の状態をデバッグ
+    const computedStyle = window.getComputedStyle(aiAnswerDiv);
+    console.log('Element dimensions:', {
+      width: aiAnswerDiv.offsetWidth,
+      height: aiAnswerDiv.offsetHeight,
+      display: computedStyle.display,
+      visibility: computedStyle.visibility,
+      opacity: computedStyle.opacity,
+      color: computedStyle.color,
+      backgroundColor: computedStyle.backgroundColor,
+      position: computedStyle.position,
+      top: computedStyle.top,
+      left: computedStyle.left,
+      zIndex: computedStyle.zIndex
+    });
+    
+    // 要素の位置とスクロール確認
+    const rect = aiAnswerDiv.getBoundingClientRect();
+    console.log('Element position:', {
+      top: rect.top,
+      left: rect.left,
+      bottom: rect.bottom,
+      right: rect.right,
+      inViewport: rect.top >= 0 && rect.left >= 0 && rect.bottom <= window.innerHeight && rect.right <= window.innerWidth
+    });
+    
+    // 強制的に再描画をトリガー
+    aiAnswerDiv.style.display = 'none';
+    aiAnswerDiv.offsetHeight; // リフロー強制
+    aiAnswerDiv.style.display = 'block';
+    
+    if (counter >= 5) {
+      clearInterval(testInterval);
+      console.log('Timer test completed, starting real streaming...');
+      
+      setTimeout(() => {
+        // スタイルを元に戻す
+        console.log('Resetting styles and starting actual streaming...');
+        aiAnswerDiv.style.backgroundColor = '';
+        aiAnswerDiv.style.border = '';
+        aiAnswerDiv.style.fontSize = '';
+        aiAnswerDiv.style.color = '';
+        aiAnswerDiv.style.padding = '';
+        aiAnswerDiv.style.margin = '';
+        aiAnswerDiv.style.display = '';
+        aiAnswerDiv.style.visibility = '';
+        aiAnswerDiv.style.opacity = '';
+        aiAnswerDiv.style.position = '';
+        aiAnswerDiv.style.zIndex = '';
+        aiAnswerDiv.style.minHeight = '';
+        aiAnswerDiv.style.width = '';
+        aiAnswerDiv.textContent = '';
+        
+        console.log('Styles reset, aiAnswerDiv element:', aiAnswerDiv);
+        console.log('Starting actual streaming with query:', query);
+        startActualStreaming(query);
+      }, 2000);
+    }
+  }, 500);
+}
+
+function startActualStreaming(query) {
+  const loadingIndicator = document.getElementById('loading-indicator');
+  const aiAnswerDiv = document.getElementById('ai-answer');
+  const errorDiv = document.getElementById('error-message');
+  const referenceDocsDiv = document.getElementById('reference-documents');
+  
+  const eventSource = new EventSource('/documents/stream_answer?q=' + encodeURIComponent(query));
+  let answerText = '';
+  
+  eventSource.onmessage = function(event) {
+    console.log('SSE message received:', event.data);
+    
+    try {
+      const data = JSON.parse(event.data);
+      console.log('Parsed SSE data:', data);
+      console.log('Data type:', data.type);
+      
+      switch (data.type) {
+        case 'documents':
+          console.log('Processing documents:', data.data);
+          displayReferenceDocuments(data.data);
+          referenceDocsDiv.style.display = 'block';
+          break;
+          
+        case 'answer_start':
+          console.log('Answer start received');
+          loadingIndicator.style.display = 'none';
+          break;
+          
+        case 'data':
+          console.log('Data chunk received:', data);
+          console.log('Current answerText length before:', answerText.length);
+          
+          if (answerText.length === 0) {
+            console.log('First chunk, hiding loading indicator');
+            loadingIndicator.style.display = 'none';
+          }
+          
+          if (data.content) {
+            console.log('Adding content:', data.content);
+            answerText += data.content;
+            
+            console.log('Total answerText now:', answerText);
+            console.log('Setting aiAnswerDiv innerHTML to:', answerText.replace(/\n/g, '<br>'));
+            
+            // requestAnimationFrameを使って強制的にレンダリング
+            requestAnimationFrame(() => {
+              aiAnswerDiv.innerHTML = answerText.replace(/\n/g, '<br>');
+              
+              // さらに強制的にレンダリングを促す
+              aiAnswerDiv.style.transform = 'translateZ(0)'; // GPU層を作成
+              
+              // 別のアプローチ：setTimeoutでイベントループを分ける
+              setTimeout(() => {
+                aiAnswerDiv.innerHTML = answerText.replace(/\n/g, '<br>');
+                console.log('Updated via setTimeout');
+              }, 0);
+              
+              // 更新後の状態確認
+              console.log('aiAnswerDiv innerHTML after update:', aiAnswerDiv.innerHTML);
+              console.log('aiAnswerDiv textContent after update:', aiAnswerDiv.textContent);
+            });
+            
+            console.log('Updated text length:', answerText.length);
+          } else {
+            console.log('No content in data chunk');
+          }
+          
+          if (data.final) {
+            console.log('Final chunk received, closing connection');
+            eventSource.close();
+          }
+          break;
+          
+        case 'answer_complete':
+          eventSource.close();
+          break;
+          
+        case 'error':
+          showError(data.message);
+          eventSource.close();
+          break;
+      }
+    } catch (e) {
+      console.error('Error parsing SSE data:', e);
+    }
+  };
+  
+  eventSource.onerror = function(event) {
+    console.error('EventSource error:', event);
+    showError('接続エラーが発生しました。');
+    eventSource.close();
+  };
+}
+
+function displayReferenceDocuments(documents) {
+  const documentsListDiv = document.getElementById('documents-list');
+  
+  documentsListDiv.innerHTML = documents.map((doc, index) => `
+    <div style="border: 1px solid #e5e5e5; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; background: #f9f9f9;">
+      <h4 style="font-size: 1rem; font-weight: 600; margin: 0 0 0.75rem 0;">
+        <a href="/documents/${doc.id}" style="color: #3b82f6; text-decoration: none;">
+          📄 ${escapeHtml(doc.title)}
+        </a>
+      </h4>
+      <p style="color: #666; margin: 0; font-size: 0.9rem; line-height: 1.5;">
+        ${escapeHtml(doc.content)}
+      </p>
+    </div>
+  `).join('');
+}
+
+function showError(message) {
+  const loadingIndicator = document.getElementById('loading-indicator');
+  const errorDiv = document.getElementById('error-message');
+  
+  loadingIndicator.style.display = 'none';
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+</script>

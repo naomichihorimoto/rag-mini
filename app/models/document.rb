@@ -47,6 +47,34 @@ class Document < ApplicationRecord
     end
   end
 
+  # ストリーミング形式でAI回答を生成
+  def self.generate_ai_answer_stream(question, relevant_documents, &block)
+    puts "=== generate_ai_answer_stream called ==="
+    puts "Question: #{question}"
+    puts "Documents count: #{relevant_documents.length}"
+
+    if relevant_documents.empty?
+      yield "関連する文書が見つかりませんでした。"
+      return
+    end
+
+    begin
+      # 関連文書のコンテンツを結合
+      context = relevant_documents.map.with_index(1) do |doc, index|
+        "【文書#{index}: #{doc.title}】\n#{doc.content}"
+      end.join("\n\n")
+
+      # プロンプトを構築
+      prompt = build_answer_prompt(question, context)
+
+      # ストリーミングでLLM回答を生成
+      generate_llm_response_stream(prompt, &block)
+    rescue => e
+      puts "Error in generate_ai_answer_stream: #{e.message}"
+      yield "AI回答の生成中にエラーが発生しました: #{e.message}"
+    end
+  end
+
   private
 
   # Ollamaを使用してベクトル埋め込みを生成
@@ -96,22 +124,14 @@ class Document < ApplicationRecord
   # LLM回答生成用のプロンプトを構築
   def self.build_answer_prompt(question, context)
     <<~PROMPT
-      あなたは文書検索システムのAIアシスタントです。
-      ユーザーの質問に対して、提供された文書の内容に基づいて正確で役立つ回答を提供してください。
+      以下の文書から質問に答えてください。文書にない情報は推測しないでください。
 
-      # 注意事項
-      - 提供された文書の内容のみを根拠として回答してください
-      - 文書に記載されていない情報は推測しないでください
-      - 回答は日本語で、わかりやすく丁寧に説明してください
-      - 関連する文書名も回答に含めてください
-
-      # 関連文書
+      文書:
       #{context}
 
-      # ユーザーの質問
-      #{question}
+      質問: #{question}
 
-      # 回答
+      回答:
     PROMPT
   end
 
@@ -139,9 +159,11 @@ class Document < ApplicationRecord
       prompt: prompt,
       stream: false,
       options: {
-        temperature: 0.3,  # 創造性を抑えて正確性を重視
-        top_p: 0.8,
-        num_predict: 1000  # Ollamaでは max_tokens ではなく num_predict を使用
+        temperature: 0.1,      # より低い温度で一貫性を重視
+        top_p: 0.5,           # より集中的な選択
+        num_predict: 300,     # 短めの回答（300トークン）
+        num_ctx: 1024,        # コンテキストウィンドウを小さく
+        stop: ["。\n\n", "\n\n参考文書", "\n\n質問:"]  # 早期終了条件
       }
     }.to_json
 
@@ -183,6 +205,129 @@ class Document < ApplicationRecord
       Rails.logger.error error_msg
       Rails.logger.error "Ollama URL: #{ollama_base_url}"
       return "LLMサービスに接続できませんでした: #{e.message}"
+    end
+  end
+
+  # ストリーミング形式でOllamaのLLMに対してテキスト生成リクエストを送信
+  def self.generate_llm_response_stream(prompt, &block)
+    require 'net/http'
+    require 'json'
+
+    puts "=== generate_llm_response_stream called ==="
+
+    # Docker環境では環境変数からOllama URLとモデルを取得
+    ollama_base_url = ENV['OLLAMA_BASE_URL'] || 'http://localhost:11434'
+    ollama_gen_model = ENV['OLLAMA_GEN_MODEL'] || 'gemma3:4b'
+
+    puts "Ollama URL: #{ollama_base_url}"
+    puts "Model: #{ollama_gen_model}"
+
+    # Ollama API のエンドポイント
+    uri = URI("#{ollama_base_url}/api/generate")
+    puts "API Endpoint: #{uri}"
+
+    # リクエストボディ（ストリーミング有効）
+    request_body = {
+      model: ollama_gen_model,
+      prompt: prompt,
+      stream: true,  # ストリーミングを有効化
+      options: {
+        temperature: 0.1,
+        top_p: 0.5,
+        num_predict: 300,
+        num_ctx: 1024,
+        stop: ["。\n\n", "\n\n参考文書", "\n\n質問:"]
+      }
+    }.to_json
+
+    puts "Request body size: #{request_body.length} bytes"
+
+    # HTTPリクエストを送信
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.read_timeout = 120
+
+    request = Net::HTTP::Post.new(uri)
+    request['Content-Type'] = 'application/json'
+    request.body = request_body
+
+    puts "Sending streaming request to Ollama..."
+
+    begin
+      http.request(request) do |response|
+        puts "Streaming response received. Status: #{response.code}"
+
+        if response.code == '200'
+          puts "Starting to read streaming response body..."
+          buffer = ""
+          chunk_count = 0
+          response.read_body do |chunk|
+            chunk_count += 1
+            puts "Received chunk #{chunk_count}: #{chunk.length} bytes"
+            puts "Chunk content: #{chunk[0..200]}#{'...' if chunk.length > 200}"
+            buffer += chunk
+            lines = buffer.split("\n")
+            buffer = lines.pop || "" # 最後の不完全な行は保持
+
+            # チャンク自体がJSONの場合もあるので、直接解析を試す
+            if !chunk.strip.empty?
+              puts "Processing chunk directly: #{chunk[0..100]}#{'...' if chunk.length > 100}"
+
+              begin
+                json_data = JSON.parse(chunk)
+                puts "Parsed JSON: response=#{json_data['response'] ? json_data['response'][0..50] : 'nil'}, done=#{json_data['done']}"
+                if json_data['response'] && !json_data['response'].empty?
+                  puts "Yielding response chunk: #{json_data['response'][0..50]}..."
+                  yield json_data['response']
+                end
+
+                # 生成完了チェック
+                if json_data['done']
+                  puts "Streaming completed (done=true)"
+                  break
+                end
+              rescue JSON::ParserError => e
+                puts "JSON parse error on chunk: #{e.message}, chunk: #{chunk[0..100]}#{'...' if chunk.length > 100}"
+
+                # 行ごとの解析も試す
+                lines.each do |line|
+                  next if line.strip.empty?
+                  puts "Processing line: #{line[0..100]}#{'...' if line.length > 100}"
+
+                  begin
+                    json_data = JSON.parse(line)
+                    puts "Parsed JSON: response=#{json_data['response'] ? json_data['response'][0..50] : 'nil'}, done=#{json_data['done']}"
+                    if json_data['response'] && !json_data['response'].empty?
+                      puts "Yielding response chunk: #{json_data['response'][0..50]}..."
+                      yield json_data['response']
+                    end
+
+                    # 生成完了チェック
+                    if json_data['done']
+                      puts "Streaming completed (done=true)"
+                      break
+                    end
+                  rescue JSON::ParserError => line_e
+                    puts "JSON parse error on line: #{line_e.message}, line: #{line[0..100]}#{'...' if line.length > 100}"
+                    next
+                  end
+                end
+              end
+            end
+          end
+          puts "Finished reading streaming response body"
+        else
+          error_msg = "Error from Ollama streaming API: #{response.code} #{response.message}"
+          puts error_msg
+          Rails.logger.error error_msg
+          yield "LLMサービスとの通信中にエラーが発生しました。ステータス: #{response.code}"
+        end
+      end
+    rescue => e
+      error_msg = "Error connecting to Ollama streaming: #{e.message}"
+      puts error_msg
+      puts "Error class: #{e.class}"
+      Rails.logger.error error_msg
+      yield "LLMサービスに接続できませんでした: #{e.message}"
     end
   end
 end

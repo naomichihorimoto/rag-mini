@@ -1,0 +1,308 @@
+<div class="container" style="padding: 2rem 1rem;">
+  <div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="font-size: 2rem; font-weight: bold; color: #333; margin-bottom: 2rem;">🤖 AI回答</h1>
+
+    <!-- 質問表示 -->
+    <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: white;">📝 あなたの質問</h2>
+      <p style="font-size: 1.1rem; margin: 0; line-height: 1.6;"><%= @search_query %></p>
+    </div>
+
+    <!-- AI回答 -->
+    <div class="card" style="margin-bottom: 2rem; border-left: 4px solid #10b981;">
+      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: #10b981;">🤖 AI回答</h2>
+      
+      <!-- ローディング表示 -->
+      <div id="loading-indicator" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+        <div style="width: 20px; height: 20px; border: 2px solid #10b981; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <span style="color: #666;">AIが回答を生成中...</span>
+      </div>
+      
+      <!-- ストリーミング回答表示エリア -->
+      <div id="ai-answer" style="font-size: 1rem; line-height: 1.7; color: #333; min-height: 50px; border: 1px solid #e5e5e5; padding: 1rem; border-radius: 0.5rem; background: #fafafa;">
+      </div>
+
+      <!-- エラー表示エリア -->
+      <div id="error-message" style="display: none; color: #dc2626; background: #fef2f2; padding: 1rem; border-radius: 0.5rem; margin-top: 1rem;">
+      </div>
+    </div>
+
+    <!-- 参考文書 -->
+    <div id="reference-documents" class="card" style="margin-bottom: 2rem; display: none;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #333;">📚 参考にした文書</h3>
+      <div id="documents-list"></div>
+    </div>
+
+    <!-- 操作ボタン -->
+    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+      <%= link_to "← 戻る", documents_path, class: "btn btn-secondary" %>
+
+      <%= form_with url: answer_documents_path, method: :get, style: "display: inline-block;" do |f| %>
+        <%= f.hidden_field :q, value: @search_query %>
+        <%= f.submit "🔄 再生成", class: "btn btn-primary" %>
+      <% end %>
+
+      <%= link_to "📄 検索結果を見る", search_documents_path(q: @search_query), class: "btn btn-secondary" %>
+    </div>
+
+    <!-- 新しい質問フォーム -->
+    <div class="card" style="margin-top: 2rem; background: #f8fafc;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #333;">💭 新しい質問をする</h3>
+
+      <%= form_with url: answer_documents_path, method: :get, style: "display: flex; gap: 1rem;" do |f| %>
+        <%= f.text_field :q,
+              placeholder: "他に質問はありますか？",
+              class: "form-control",
+              style: "flex: 1;" %>
+        <%= f.submit "🤖 AI回答", class: "btn btn-primary" %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const query = '<%= j(@search_query) %>';
+  
+  if (query) {
+    startStreamingAnswer(query);
+  }
+});
+
+function startStreamingAnswer(query) {
+  const loadingIndicator = document.getElementById('loading-indicator');
+  const aiAnswerDiv = document.getElementById('ai-answer');
+  const errorDiv = document.getElementById('error-message');
+  const referenceDocsDiv = document.getElementById('reference-documents');
+  const documentsListDiv = document.getElementById('documents-list');
+  
+  // 初期状態の設定
+  loadingIndicator.style.display = 'flex';
+  aiAnswerDiv.textContent = '';
+  errorDiv.style.display = 'none';
+  referenceDocsDiv.style.display = 'none';
+  
+  // まず、シンプルなタイマーテストを実行
+  console.log('Starting timer test...');
+  let testText = '';
+  let counter = 0;
+  const testInterval = setInterval(() => {
+    counter++;
+    testText += `チャンク${counter} `;
+    aiAnswerDiv.textContent = testText;
+    console.log(`Timer test ${counter}: ${testText}`);
+    
+    if (counter >= 5) {
+      clearInterval(testInterval);
+      console.log('Timer test completed, starting real streaming...');
+      
+      // タイマーテスト完了後、実際のストリーミングを開始
+      setTimeout(() => {
+        aiAnswerDiv.textContent = '';
+        startActualStreaming(query, loadingIndicator, aiAnswerDiv, errorDiv, referenceDocsDiv, documentsListDiv);
+      }, 2000);
+    }
+  }, 500); // 500msごとに更新
+}
+
+function startActualStreaming(query, loadingIndicator, aiAnswerDiv, errorDiv, referenceDocsDiv, documentsListDiv) {
+  
+function startActualStreaming(query, loadingIndicator, aiAnswerDiv, errorDiv, referenceDocsDiv, documentsListDiv) {
+  // EventSourceでSSE接続を開始
+  const eventSource = new EventSource('/documents/stream_answer?q=' + encodeURIComponent(query));
+  
+  let answerText = '';
+  
+  eventSource.onmessage = function(event) {
+    console.log('=== SSE message received ===');
+    console.log('Raw event data:', event.data);
+    
+    try {
+      const data = JSON.parse(event.data);
+      console.log('Parsed data type:', data.type);
+      console.log('Full parsed data:', data);
+      
+      switch (data.type) {
+        case 'documents':
+          // 参考文書を表示
+          console.log('Received documents:', data.data);
+          displayReferenceDocuments(data.data);
+          referenceDocsDiv.style.display = 'block';
+          break;
+          
+        case 'answer_start':
+          // 回答開始
+          console.log('Answer generation started');
+          loadingIndicator.style.display = 'none';
+          break;
+          
+        case 'data':
+          // 回答データを受信
+          console.log('*** Received chunk content:', JSON.stringify(data.content));
+          console.log('*** Current answer length before:', answerText.length);
+          
+          // 最初のチャンクの場合はローディングを隠す
+          if (answerText.length === 0) {
+            loadingIndicator.style.display = 'none';
+            console.log('*** Hidden loading indicator on first chunk');
+          }
+          
+          if (data.content) {
+            answerText += data.content;
+            
+            // textContentとinnerHTMLの両方を試す
+            aiAnswerDiv.innerHTML = answerText.replace(/\n/g, '<br>');
+            
+            console.log('*** Updated answer text (first 100 chars):', answerText.substring(0, 100));
+            console.log('*** DOM element innerHTML (first 100 chars):', aiAnswerDiv.innerHTML.substring(0, 100));
+            console.log('*** DOM element is visible:', aiAnswerDiv.style.display !== 'none');
+            
+            // DOM要素を強制的に再描画
+            aiAnswerDiv.style.display = 'block';
+            
+            // ブラウザの描画を強制的にフラッシュ
+            aiAnswerDiv.offsetHeight; // これにより強制的にレイアウトを再計算
+            
+            // 自動スクロール
+            aiAnswerDiv.scrollTop = aiAnswerDiv.scrollHeight;
+          }
+          
+          if (data.final) {
+            console.log('Final chunk received');
+            eventSource.close();
+          }
+          break;
+          
+        case 'answer_complete':
+          // 回答完了
+          console.log('Answer generation completed');
+          eventSource.close();
+          break;
+          
+        case 'error':
+          // エラー表示
+          console.error('SSE error:', data.message);
+          showError(data.message);
+          eventSource.close();
+          break;
+          
+        default:
+          console.log('Unknown message type:', data.type);
+      }
+    } catch (e) {
+      console.error('Error parsing SSE data:', e);
+      console.error('Raw event data:', event.data);
+    }
+  };
+  
+  eventSource.onerror = function(event) {
+    console.error('EventSource error:', event);
+    console.error('EventSource readyState:', eventSource.readyState);
+    
+    if (eventSource.readyState === EventSource.CLOSED) {
+      console.log('EventSource connection closed');
+    } else if (eventSource.readyState === EventSource.CONNECTING) {
+      console.log('EventSource reconnecting...');
+    } else {
+      showError('接続エラーが発生しました。ページを再読み込みしてください。');
+      eventSource.close();
+    }
+  };
+  
+  eventSource.onopen = function(event) {
+    console.log('EventSource connection opened');
+  };
+}
+          showError(data.message);
+          eventSource.close();
+          break;
+          
+        default:
+          console.log('Unknown message type:', data.type);
+      }
+    } catch (e) {
+      console.error('Error parsing SSE data:', e);
+      console.error('Raw event data:', event.data);
+    }
+  };
+  
+  eventSource.onerror = function(event) {
+    console.error('EventSource error:', event);
+    console.error('EventSource readyState:', eventSource.readyState);
+    
+    if (eventSource.readyState === EventSource.CLOSED) {
+      console.log('EventSource connection closed');
+    } else if (eventSource.readyState === EventSource.CONNECTING) {
+      console.log('EventSource reconnecting...');
+    } else {
+      showError('接続エラーが発生しました。ページを再読み込みしてください。');
+      eventSource.close();
+    }
+  };
+  
+  eventSource.onopen = function(event) {
+    console.log('EventSource connection opened');
+  };
+}
+
+function displayReferenceDocuments(documents) {
+  const documentsListDiv = document.getElementById('documents-list');
+  
+  documentsListDiv.innerHTML = documents.map((doc, index) => `
+    <div style="border: 1px solid #e5e5e5; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; background: #f9f9f9;" class="fade-in">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+        <h4 style="font-size: 1rem; font-weight: 600; margin: 0;">
+          <a href="/documents/${doc.id}" style="color: #3b82f6; text-decoration: none;">
+            📄 ${escapeHtml(doc.title)}
+          </a>
+        </h4>
+        <span style="font-size: 0.875rem; color: #666; background: #e5e7eb; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">
+          文書 ${index + 1}
+        </span>
+      </div>
+      
+      <p style="color: #666; margin: 0; font-size: 0.9rem; line-height: 1.5;">
+        ${escapeHtml(doc.content)}
+      </p>
+      
+      <div style="margin-top: 0.75rem;">
+        <a href="/documents/${doc.id}" style="color: #3b82f6; text-decoration: none; font-size: 0.875rem; font-weight: 500;">
+          詳細を見る →
+        </a>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showError(message) {
+  const loadingIndicator = document.getElementById('loading-indicator');
+  const errorDiv = document.getElementById('error-message');
+  
+  loadingIndicator.style.display = 'none';
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+  errorDiv.classList.add('fade-in');
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+</script>
