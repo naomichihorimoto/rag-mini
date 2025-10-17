@@ -19,7 +19,7 @@
       </div>
 
       <!-- ストリーミング回答表示エリア -->
-      <div id="ai-answer" style="font-size: 1rem; line-height: 1.7; color: #333; min-height: 50px; border: 1px solid #e5e5e5; padding: 1rem; border-radius: 0.5rem; background: #fafafa;">
+      <div id="ai-answer" class="markdown-content" style="font-size: 1rem; line-height: 1.7; color: #333; min-height: 50px; border: 1px solid #e5e5e5; padding: 1rem; border-radius: 0.5rem; background: #fafafa;">
       </div>
 
       <!-- エラー表示エリア -->
@@ -60,103 +60,7 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Markdown content styling for AI answer */
-#ai-answer h1, #ai-answer h2, #ai-answer h3, #ai-answer h4, #ai-answer h5, #ai-answer h6 {
-  margin: 1.5rem 0 1rem 0;
-  font-weight: 600;
-  color: #1f2937;
-}
 
-#ai-answer h1 { font-size: 1.75rem; }
-#ai-answer h2 { font-size: 1.5rem; }
-#ai-answer h3 { font-size: 1.25rem; }
-#ai-answer h4 { font-size: 1.125rem; }
-#ai-answer h5 { font-size: 1rem; }
-#ai-answer h6 { font-size: 0.875rem; }
-
-#ai-answer ul, #ai-answer ol {
-  margin: 1rem 0;
-  padding-left: 2rem;
-}
-
-#ai-answer li {
-  margin: 0.5rem 0;
-}
-
-#ai-answer p {
-  margin: 1rem 0;
-}
-
-#ai-answer blockquote {
-  border-left: 4px solid #d1d5db;
-  margin: 1rem 0;
-  padding-left: 1rem;
-  color: #6b7280;
-  font-style: italic;
-}
-
-#ai-answer code {
-  background: #f3f4f6;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 0.875rem;
-}
-
-#ai-answer pre {
-  background: #1f2937;
-  color: #f9fafb;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  overflow-x: auto;
-  margin: 1rem 0;
-}
-
-#ai-answer pre code {
-  background: none;
-  padding: 0;
-  color: inherit;
-}
-
-#ai-answer table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 1rem 0;
-}
-
-#ai-answer th, #ai-answer td {
-  border: 1px solid #d1d5db;
-  padding: 0.5rem;
-  text-align: left;
-}
-
-#ai-answer th {
-  background: #f3f4f6;
-  font-weight: 600;
-}
-
-#ai-answer a {
-  color: #3b82f6;
-  text-decoration: underline;
-}
-
-#ai-answer a:hover {
-  color: #1d4ed8;
-}
-
-#ai-answer strong {
-  font-weight: 600;
-}
-
-#ai-answer em {
-  font-style: italic;
-}
-
-#ai-answer hr {
-  border: none;
-  border-top: 1px solid #d1d5db;
-  margin: 2rem 0;
-}
 </style>
 
 <script>
