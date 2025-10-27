@@ -1,8 +1,9 @@
 require 'net/http'
 require 'json'
+require 'pdf-reader'
 
 namespace :rag do
-  desc "Import all .md and .txt files from ingest directory into documents table with embeddings"
+  desc "Import all .md, .txt, and .pdf files from ingest directory into documents table with embeddings"
   task ingest: :environment do
     ingest_dir = Rails.root.join('ingest')
 
@@ -12,7 +13,7 @@ namespace :rag do
     end
 
     # サポートする拡張子
-    supported_extensions = %w[.md .txt]
+    supported_extensions = %w[.md .txt .pdf]
 
     # ingestディレクトリ内の対象ファイルを検索
     files = Dir.glob(File.join(ingest_dir, '**', '*')).select do |file|
@@ -20,7 +21,7 @@ namespace :rag do
     end
 
     if files.empty?
-      puts "No .md or .txt files found in #{ingest_dir}"
+      puts "No .md, .txt, or .pdf files found in #{ingest_dir}"
       puts "Supported extensions: #{supported_extensions.join(', ')}"
       exit 1
     end
@@ -36,7 +37,19 @@ namespace :rag do
       begin
         puts "Processing #{File.basename(file_path)}..."
 
-        content = File.read(file_path)
+        # ファイルの拡張子に応じてコンテンツを読み込み
+        file_extension = File.extname(file_path).downcase
+        content = if file_extension == '.pdf'
+          extract_text_from_pdf(file_path)
+        else
+          File.read(file_path)
+        end
+
+        if content.nil? || content.strip.empty?
+          puts "  ❌ Error: No content extracted from #{File.basename(file_path)}"
+          error_count += 1
+          next
+        end
 
         # ファイル名からタイトルを生成（拡張子を除く）
         title = File.basename(file_path, '.*')
@@ -188,6 +201,34 @@ namespace :rag do
   end
 
   private
+
+  def extract_text_from_pdf(pdf_path)
+    puts "  Extracting text from PDF..."
+
+    begin
+      reader = PDF::Reader.new(pdf_path)
+      text_content = ""
+
+      reader.pages.each_with_index do |page, index|
+        page_text = page.text.strip
+        unless page_text.empty?
+          text_content += "Page #{index + 1}:\n#{page_text}\n\n"
+        end
+      end
+
+      if text_content.strip.empty?
+        puts "  ⚠️  Warning: No text content found in PDF"
+        return nil
+      end
+
+      puts "  ✅ Extracted text from #{reader.page_count} pages"
+      text_content.strip
+
+    rescue => e
+      puts "  ❌ Error extracting text from PDF: #{e.message}"
+      return nil
+    end
+  end
 
   def generate_embedding(text)
     # Docker環境では環境変数からOllama URLを取得
