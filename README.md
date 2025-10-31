@@ -27,7 +27,7 @@ docker compose exec ollama ollama pull gemma3:4b
 ## 文書のimport方法
 
 ```
-# ingest/の全ファイルを取り込み（.mdもしくは.txtファイル）
+# ingest/の全ファイルを取り込み（.mdもしくは.txt,.pdfファイル）
 docker-compose exec web bundle exec rake rag:ingest
 
 # 取り込まれた文書を確認
