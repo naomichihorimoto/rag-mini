@@ -82,17 +82,11 @@ class Document < ApplicationRecord
     require 'net/http'
     require 'json'
 
-    # Docker環境では環境変数からOllama URLを取得
-    ollama_base_url = ENV['OLLAMA_BASE_URL'] || 'http://localhost:11434'
-    ollama_model = ENV['OLLAMA_EMBED_MODEL'] || 'nomic-embed-text'
-
-    # Ollama APIのエンドポイント
-    uri = URI("#{ollama_base_url}/api/embeddings")
+    uri = URI(ENV['EMBED_API_URL'] || 'http://localhost:8000/embed')
 
     # リクエストボディ
     request_body = {
-      model: ollama_model,
-      prompt: text
+      text: text
     }.to_json
 
     # HTTPリクエストを送信
