@@ -6,6 +6,7 @@ services:
     environment:
       - RAILS_ENV=development
       - DATABASE_URL=postgres://postgres:postgres@db:5432/rag_dev
+      - EMBED_API_URL=http://embedder:8000/embed
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_EMBED_MODEL=nomic-embed-text   # 768次元
       - OLLAMA_GEN_MODEL=gemma2:2b # より軽量で高速なモデル
@@ -15,6 +16,7 @@ services:
     depends_on:
       - db
       - ollama
+      - embedder
 
   db:
     image: pgvector/pgvector:pg16   # pgvector入りのPostgres 16
@@ -37,6 +39,14 @@ services:
       - "11434:11434"
     volumes:
       - ollama:/root/.ollama
+
+  embedder:
+    build: ./embedder
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./embedder:/app
+
 volumes:
   ollama: {}
   db-data: {}
